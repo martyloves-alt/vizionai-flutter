@@ -1,0 +1,37 @@
+name: Bootstrap Flutter Project
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+          channel: 'stable'
+
+      - name: Create Flutter scaffold
+        run: |
+          flutter create . \
+            --project-name vizionai \
+            --org com.vizionai \
+            --platforms android,web \
+            --description "VizionAI Studio - AI video generation"
+
+      - name: Remove default app
+        run: rm -f lib/main.dart
+
+      - name: Commit
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Bootstrap Flutter scaffold" || echo "Nothing to commit"
+          git push
