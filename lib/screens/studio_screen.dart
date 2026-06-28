@@ -10,16 +10,18 @@ class StudioScreen extends StatefulWidget {
 }
 
 class _StudioScreenState extends State<StudioScreen> {
-  final _promptController = TextEditingController();
-  final _apiKeyController = TextEditingController();
+  final _promptController   = TextEditingController();
+  final _apiKeyController   = TextEditingController();
+  final _imageUrlController = TextEditingController();
 
-  String _selectedRatio = '16:9';
-  bool _isGenerating = false;
-  String _statusMessage = '';
-  String? _videoUrl;
-  String? _errorMessage;
-  bool _showDirector = false;
-  bool _showSettings = false;
+  GenerationMode _mode           = GenerationMode.textToVideo;
+  String         _selectedRatio  = '16:9';
+  bool           _isGenerating   = false;
+  String         _statusMessage  = '';
+  String?        _videoUrl;
+  String?        _errorMessage;
+  bool           _showDirector   = false;
+  bool           _showSettings   = false;
 
   double _fluidity = 50;
   double _gravity  = 50;
@@ -33,40 +35,47 @@ class _StudioScreenState extends State<StudioScreen> {
   void dispose() {
     _promptController.dispose();
     _apiKeyController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
   }
 
   Future<void> _generate() async {
-    if (_promptController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Écris un prompt !')),
-      );
-      return;
-    }
     if (_apiKeyController.text.trim().isEmpty) {
       setState(() => _showSettings = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Entre ta clé API Replicate en haut !')),
-      );
+      _snack('Entre ta clé API Replicate en haut !');
+      return;
+    }
+    if (_mode == GenerationMode.textToVideo &&
+        _promptController.text.trim().isEmpty) {
+      _snack('Écris un prompt !');
+      return;
+    }
+    if (_mode == GenerationMode.imageToVideo &&
+        _imageUrlController.text.trim().isEmpty) {
+      _snack('Colle l\'URL de ton image !');
       return;
     }
 
     setState(() {
-      _isGenerating = true;
+      _isGenerating  = true;
       _statusMessage = 'Connexion...';
-      _videoUrl = null;
-      _errorMessage = null;
+      _videoUrl      = null;
+      _errorMessage  = null;
     });
 
     final result = await GenerationEngine.generate(
       GenerationRequest(
-        prompt: _promptController.text,
-        ratio: _selectedRatio,
-        director: DirectorSettings(
-          pan: _pan, tilt: _tilt, zoom: _zoom,
+        prompt   : _promptController.text,
+        ratio    : _selectedRatio,
+        director : DirectorSettings(
           fluidity: _fluidity, gravity: _gravity,
+          pan: _pan, tilt: _tilt, zoom: _zoom,
         ),
-        apiKey: _apiKeyController.text.trim(),
+        apiKey   : _apiKeyController.text.trim(),
+        mode     : _mode,
+        imageUrl : _imageUrlController.text.trim().isEmpty
+            ? null
+            : _imageUrlController.text.trim(),
       ),
       onStatus: (s) => setState(() => _statusMessage = s),
     );
@@ -74,13 +83,18 @@ class _StudioScreenState extends State<StudioScreen> {
     setState(() {
       _isGenerating = false;
       if (result.status == 'succeeded') {
-        _videoUrl = result.videoUrl;
+        _videoUrl      = result.videoUrl;
         _statusMessage = 'Vidéo prête !';
       } else {
-        _errorMessage = result.error;
+        _errorMessage  = result.error;
         _statusMessage = 'Erreur';
       }
     });
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -122,7 +136,7 @@ class _StudioScreenState extends State<StudioScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // ── CLÉ API ──
+            // ── CLÉ API ──────────────────────────────────────────
             if (_showSettings) ...[
               _label('CLÉ API REPLICATE'),
               _textField(_apiKeyController,
@@ -130,14 +144,62 @@ class _StudioScreenState extends State<StudioScreen> {
               const SizedBox(height: 16),
             ],
 
-            // ── PROMPT ──
-            _label('PROMPT'),
-            _textField(_promptController,
-                hint: 'A cinematic drone shot over Paris at sunset...',
-                lines: 4),
+            // ── SÉLECTEUR DE MODE ────────────────────────────────
+            _label('MODE DE GÉNÉRATION'),
+            Row(children: [
+              _modeBtn(
+                label : '✍️  TEXTE → VIDÉO',
+                mode  : GenerationMode.textToVideo,
+                tip   : 'Wan 2.1',
+              ),
+              const SizedBox(width: 10),
+              _modeBtn(
+                label : '🖼️  IMAGE → VIDÉO',
+                mode  : GenerationMode.imageToVideo,
+                tip   : 'SVD',
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Text(
+              _mode == GenerationMode.textToVideo
+                  ? '💡 Modèle : Wan 2.1 — Écris en anglais pour de meilleurs résultats'
+                  : '💡 Modèle : Stable Video Diffusion — Colle l\'URL d\'une image',
+              style: const TextStyle(
+                  color: Color(0xFF555555), fontSize: 10),
+            ),
             const SizedBox(height: 20),
 
-            // ── FORMAT ──
+            // ── PROMPT (mode texte) ──────────────────────────────
+            if (_mode == GenerationMode.textToVideo) ...[
+              _label('PROMPT (EN ANGLAIS)'),
+              _textField(_promptController,
+                  hint: 'A smiling doctor in a hospital, cinematic 4K...',
+                  lines: 4),
+              const SizedBox(height: 20),
+            ],
+
+            // ── IMAGE URL (mode image) ────────────────────────────
+            if (_mode == GenerationMode.imageToVideo) ...[
+              _label('URL DE TON IMAGE'),
+              _textField(_imageUrlController,
+                  hint: 'https://exemple.com/mon-image.jpg'),
+              const SizedBox(height: 8),
+              const Text(
+                '💡 Astuce : Upload ton image sur imgur.com ou postimages.org\n'
+                'puis copie le lien direct ici.',
+                style: TextStyle(
+                    color: Color(0xFF555555), fontSize: 10,
+                    height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              _label('PROMPT (OPTIONNEL)'),
+              _textField(_promptController,
+                  hint: 'Describe the motion (optional)...',
+                  lines: 2),
+              const SizedBox(height: 20),
+            ],
+
+            // ── FORMAT ───────────────────────────────────────────
             _label('FORMAT'),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -163,8 +225,9 @@ class _StudioScreenState extends State<StudioScreen> {
                       ),
                       child: Text(r,
                           style: TextStyle(
-                            color:
-                                sel ? Colors.black : const Color(0xFF999999),
+                            color: sel
+                                ? Colors.black
+                                : const Color(0xFF999999),
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           )),
@@ -175,7 +238,7 @@ class _StudioScreenState extends State<StudioScreen> {
             ),
             const SizedBox(height: 20),
 
-            // ── DIRECTOR PANEL ──
+            // ── DIRECTOR PANEL ────────────────────────────────────
             GestureDetector(
               onTap: () =>
                   setState(() => _showDirector = !_showDirector),
@@ -192,27 +255,31 @@ class _StudioScreenState extends State<StudioScreen> {
             ),
             if (_showDirector) ...[
               const SizedBox(height: 8),
-              _slider('Fluidity', _fluidity,
-                  (v) => setState(() => _fluidity = v),
-                  sub:
-                      'motion_bucket → ${GenerationEngine.mapMotionBucket(_fluidity)}'),
-              _slider('Gravity', _gravity,
-                  (v) => setState(() => _gravity = v),
-                  sub:
-                      'cond_aug → ${GenerationEngine.mapCondAug(_gravity).toStringAsFixed(2)}'),
-              _slider('Pan', _pan,
-                  (v) => setState(() => _pan = v),
+              if (_mode == GenerationMode.textToVideo) ...[
+                _slider('Créativité (Guidance)',  _fluidity,
+                    (v) => setState(() => _fluidity = v),
+                    sub: 'scale → ${GenerationEngine.mapGuidance(_fluidity).toStringAsFixed(1)}'),
+                _slider('Qualité (Steps)', _gravity,
+                    (v) => setState(() => _gravity = v),
+                    sub: 'steps → ${GenerationEngine.mapSteps(_gravity)}'),
+              ] else ...[
+                _slider('Mouvement (Fluidity)', _fluidity,
+                    (v) => setState(() => _fluidity = v),
+                    sub: 'motion_bucket → ${GenerationEngine.mapMotionBucket(_fluidity)}'),
+                _slider('Stabilité (Gravity)', _gravity,
+                    (v) => setState(() => _gravity = v),
+                    sub: 'cond_aug → ${GenerationEngine.mapCondAug(_gravity).toStringAsFixed(2)}'),
+              ],
+              _slider('Pan',  _pan,  (v) => setState(() => _pan  = v),
                   min: -100, max: 100),
-              _slider('Tilt', _tilt,
-                  (v) => setState(() => _tilt = v),
+              _slider('Tilt', _tilt, (v) => setState(() => _tilt = v),
                   min: -100, max: 100),
-              _slider('Zoom', _zoom,
-                  (v) => setState(() => _zoom = v),
+              _slider('Zoom', _zoom, (v) => setState(() => _zoom = v),
                   min: -100, max: 100),
             ],
             const SizedBox(height: 24),
 
-            // ── BOUTON GÉNÉRER ──
+            // ── BOUTON GÉNÉRER ────────────────────────────────────
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -238,11 +305,14 @@ class _StudioScreenState extends State<StudioScreen> {
                           Text(_statusMessage,
                               style: const TextStyle(
                                   color: Color(0xFF999999),
-                                  fontSize: 13)),
+                                  fontSize: 12)),
                         ],
                       )
-                    : const Text('GÉNÉRER LA VIDÉO',
-                        style: TextStyle(
+                    : Text(
+                        _mode == GenerationMode.textToVideo
+                            ? 'GÉNÉRER LA VIDÉO'
+                            : 'ANIMER L\'IMAGE',
+                        style: const TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 2,
@@ -252,14 +322,12 @@ class _StudioScreenState extends State<StudioScreen> {
             ),
             const SizedBox(height: 20),
 
-            // ── RÉSULTAT ──
+            // ── RÉSULTAT ──────────────────────────────────────────
             if (_videoUrl != null)
               GestureDetector(
                 onTap: () {
                   Clipboard.setData(ClipboardData(text: _videoUrl!));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Lien copié !')),
-                  );
+                  _snack('Lien copié !');
                 },
                 child: Container(
                   width: double.infinity,
@@ -267,7 +335,8 @@ class _StudioScreenState extends State<StudioScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF0D1F0D),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF10B981)),
+                    border:
+                        Border.all(color: const Color(0xFF10B981)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -285,7 +354,8 @@ class _StudioScreenState extends State<StudioScreen> {
                       const SizedBox(height: 6),
                       const Text('Appuie pour copier le lien',
                           style: TextStyle(
-                              color: Color(0xFF555555), fontSize: 10)),
+                              color: Color(0xFF555555),
+                              fontSize: 10)),
                     ],
                   ),
                 ),
@@ -298,14 +368,62 @@ class _StudioScreenState extends State<StudioScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFF1F0D0D),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFEF4444)),
+                  border:
+                      Border.all(color: const Color(0xFFEF4444)),
                 ),
                 child: Text('❌ $_errorMessage',
-                    style: const TextStyle(color: Color(0xFFEF4444))),
+                    style: const TextStyle(
+                        color: Color(0xFFEF4444))),
               ),
 
             const SizedBox(height: 40),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ── WIDGETS HELPERS ────────────────────────────────────────────
+
+  Widget _modeBtn({
+    required String label,
+    required GenerationMode mode,
+    required String tip,
+  }) {
+    final sel = _mode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _mode = mode),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: sel
+                ? const Color(0xFFD4AF37)
+                : const Color(0xFF111111),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: sel
+                  ? const Color(0xFFD4AF37)
+                  : const Color(0x20FFFFFF),
+            ),
+          ),
+          child: Column(children: [
+            Text(label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: sel ? Colors.black : const Color(0xFFF2F2F2),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                )),
+            const SizedBox(height: 2),
+            Text(tip,
+                style: TextStyle(
+                  color: sel
+                      ? Colors.black54
+                      : const Color(0xFF555555),
+                  fontSize: 9,
+                )),
+          ]),
         ),
       ),
     );
@@ -327,47 +445,62 @@ class _StudioScreenState extends State<StudioScreen> {
       controller: c,
       maxLines: lines,
       obscureText: obscure,
-      style: const TextStyle(color: Color(0xFFF2F2F2), fontSize: 13),
+      style: const TextStyle(
+          color: Color(0xFFF2F2F2), fontSize: 13),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF555555), fontSize: 12),
+        hintStyle: const TextStyle(
+            color: Color(0xFF555555), fontSize: 12),
         filled: true,
         fillColor: const Color(0xFF111111),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0x20FFFFFF))),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0x20FFFFFF))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFD4AF37))),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide:
+                const BorderSide(color: Color(0x20FFFFFF))),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide:
+                const BorderSide(color: Color(0x20FFFFFF))),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide:
+                const BorderSide(color: Color(0xFFD4AF37))),
       ),
     );
   }
 
-  Widget _slider(String label, double value, ValueChanged<double> cb,
+  Widget _slider(String label, double value,
+      ValueChanged<double> cb,
       {double min = 0, double max = 100, String? sub}) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Text(label,
-            style: const TextStyle(color: Color(0xFFF2F2F2), fontSize: 12)),
-        const Spacer(),
-        Text(value.toStringAsFixed(0),
-            style: const TextStyle(color: Color(0xFFD4AF37), fontSize: 12)),
-        if (sub != null) ...[
-          const SizedBox(width: 8),
-          Text(sub,
-              style:
-                  const TextStyle(color: Color(0xFF555555), fontSize: 10)),
-        ],
-      ]),
-      SliderTheme(
-        data: const SliderThemeData(
-          activeTrackColor: Color(0xFFD4AF37),
-          inactiveTrackColor: Color(0xFF333333),
-          thumbColor: Color(0xFFD4AF37),
-        ),
-        child: Slider(value: value, min: min, max: max, onChanged: cb),
-      ),
-      const SizedBox(height: 4),
-    ]);
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Text(label,
+                style: const TextStyle(
+                    color: Color(0xFFF2F2F2), fontSize: 12)),
+            const Spacer(),
+            Text(value.toStringAsFixed(0),
+                style: const TextStyle(
+                    color: Color(0xFFD4AF37), fontSize: 12)),
+            if (sub != null) ...[
+              const SizedBox(width: 8),
+              Text(sub,
+                  style: const TextStyle(
+                      color: Color(0xFF555555), fontSize: 10)),
+            ],
+          ]),
+          SliderTheme(
+            data: const SliderThemeData(
+              activeTrackColor  : Color(0xFFD4AF37),
+              inactiveTrackColor: Color(0xFF333333),
+              thumbColor        : Color(0xFFD4AF37),
+            ),
+            child: Slider(
+                value: value, min: min, max: max,
+                onChanged: cb),
+          ),
+          const SizedBox(height: 4),
+        ]);
   }
 }
