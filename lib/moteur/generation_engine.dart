@@ -72,11 +72,8 @@ class GenerationEngine {
   // ── INPUTS ─────────────────────────────────────────────────────
 
   static Map<String, dynamic> _buildTextInput(GenerationRequest req) => {
-    'prompt'      : req.prompt.trim(),
-    'guide_scale' : mapGuidance(req.director.fluidity),
-    'steps'       : mapSteps(req.director.gravity),
-    'num_frames'  : 81,
-  };
+  'prompt': req.prompt.trim(),
+};
 
   static Map<String, dynamic> _buildImageInput(GenerationRequest req) => {
     'image'       : req.imageUrl!.trim(),
