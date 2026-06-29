@@ -93,8 +93,8 @@ class GenerationEngine {
     final isImage = request.mode == GenerationMode.imageToVideo;
 
     final endpoint = isImage
-        ? '$_baseUrl/models/wavespeedai/wan-2.1-i2v-480p/predictions'
-        : '$_baseUrl/models/wavespeedai/wan-2.1-t2v-480p/predictions';
+    ? '$_baseUrl/models/wavespeedai/wan-2.1-i2v-480p/predictions'
+    : '$_baseUrl/models/wan-video/wan-2.1-1.3b/predictions';
 
     final input = isImage
         ? _buildImageInput(request)
