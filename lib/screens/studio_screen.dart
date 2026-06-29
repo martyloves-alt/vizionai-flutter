@@ -84,12 +84,14 @@ class _StudioScreenState extends State<StudioScreen> {
     setState(() {
       _isGenerating = false;
       if (result.status == 'succeeded') {
-        _videoUrl      = result.videoUrl;
-        _statusMessage = 'Vidéo prête !';
-      } else {
-        _errorMessage  = result.error;
-        _statusMessage = 'Erreur';
-      }
+  _videoUrl      = result.videoUrl;
+  _statusMessage = 'Vidéo prête !';
+  await NotificationService.showSuccess(_videoUrl);
+} else {
+  _errorMessage  = result.error;
+  _statusMessage = 'Erreur';
+  await NotificationService.showError(result.error ?? 'Erreur inconnue');
+}
     });
   }
 
