@@ -20,12 +20,12 @@ class DirectorSettings {
 }
 
 class GenerationRequest {
-  final String          prompt;
-  final String          ratio;
+  final String           prompt;
+  final String           ratio;
   final DirectorSettings director;
-  final String          apiKey;
-  final GenerationMode  mode;
-  final String?         imageUrl;
+  final String           apiKey;
+  final GenerationMode   mode;
+  final String?          imageUrl;
 
   const GenerationRequest({
     required this.prompt,
@@ -50,47 +50,44 @@ class GenerationResult {
 }
 
 class GenerationEngine {
+
   static const String _baseUrl = 'https://api.replicate.com/v1';
 
-  // ── PARAMETER MAPPERS ──────────────────────────────────────────
+  // ── MAPPERS ────────────────────────────────────────────────────
 
-  // TEXT→VIDEO : fluidity → guidance_scale (1.0 – 10.0)
+  // fluidity (0-100) → guide_scale (1.0 – 10.0)
   static double mapGuidance(double fluidity) =>
       1.0 + (fluidity / 100.0) * 9.0;
 
-  // TEXT→VIDEO : gravity → inference steps (20 – 50)
+  // gravity (0-100) → steps (20 – 50)
   static int mapSteps(double gravity) =>
       (20 + (gravity / 100.0) * 30).round();
 
-  // IMAGE→VIDEO : fluidity → motion_bucket_id (1 – 255)
   static int mapMotionBucket(double fluidity) =>
       (fluidity * 2.55).round().clamp(1, 255);
 
-  // IMAGE→VIDEO : gravity → cond_aug (0.0 – 1.0)
   static double mapCondAug(double gravity) =>
       (gravity / 100.0).clamp(0.0, 1.0);
 
-  // ── REQUEST BUILDER ────────────────────────────────────────────
+  // ── INPUTS ─────────────────────────────────────────────────────
 
   static Map<String, dynamic> _buildTextInput(GenerationRequest req) => {
-    'prompt'               : req.prompt.trim(),
-    'negative_prompt'      : 'bad quality, blurry, distorted, watermark',
-    'num_frames'           : 81,
-    'fps'                  : 16,
-    'guidance_scale'       : mapGuidance(req.director.fluidity),
-    'num_inference_steps'  : mapSteps(req.director.gravity),
+    'prompt'      : req.prompt.trim(),
+    'guide_scale' : mapGuidance(req.director.fluidity),
+    'steps'       : mapSteps(req.director.gravity),
+    'num_frames'  : 81,
   };
 
   static Map<String, dynamic> _buildImageInput(GenerationRequest req) => {
-    'input_image'          : req.imageUrl!.trim(),
-    'video_length'         : '25_frames_with_svd_xt',
-    'sizing_strategy'      : 'maintain_aspect_ratio',
-    'frames_per_second'    : 6,
-    'motion_bucket_id'     : mapMotionBucket(req.director.fluidity),
-    'cond_aug'             : mapCondAug(req.director.gravity),
+    'image'       : req.imageUrl!.trim(),
+    'prompt'      : req.prompt.trim().isEmpty
+        ? 'cinematic video, smooth motion'
+        : req.prompt.trim(),
+    'guide_scale' : mapGuidance(req.director.fluidity),
+    'steps'       : mapSteps(req.director.gravity),
   };
 
-  // ── GENERATE ──────────────────────────────────────────────────
+  // ── GENERATE ───────────────────────────────────────────────────
 
   static Future<GenerationResult> generate(
     GenerationRequest request, {
@@ -99,7 +96,7 @@ class GenerationEngine {
     final isImage = request.mode == GenerationMode.imageToVideo;
 
     final endpoint = isImage
-        ? '$_baseUrl/models/stability-ai/stable-video-diffusion/predictions'
+        ? '$_baseUrl/models/wavespeedai/wan-2.1-i2v-480p/predictions'
         : '$_baseUrl/models/wavespeedai/wan-2.1-t2v-480p/predictions';
 
     final input = isImage
@@ -140,7 +137,7 @@ class GenerationEngine {
     }
   }
 
-  // ── POLLING ───────────────────────────────────────────────────
+  // ── POLLING ────────────────────────────────────────────────────
 
   static Future<GenerationResult> _poll(
     String id,
