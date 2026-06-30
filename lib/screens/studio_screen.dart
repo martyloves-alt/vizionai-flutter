@@ -92,11 +92,7 @@ class _StudioScreenState extends State<StudioScreen> {
   }
 });
 if (result.status == 'succeeded') {
-  NotificationService.showSuccess(_videoUrl);
-} else {
-  NotificationService.showError(result.error ?? 'Erreur inconnue');
-}
-  }
+  
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context)
