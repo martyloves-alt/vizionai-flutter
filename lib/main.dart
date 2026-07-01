@@ -4,7 +4,9 @@ import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.init();
+  try {
+    await NotificationService.init();
+  } catch (_) {}
   runApp(const VizionAIApp());
 }
 
