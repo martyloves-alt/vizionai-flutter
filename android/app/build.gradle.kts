@@ -33,8 +33,6 @@ android {
     }
 }
 
-dependencies {
-
 flutter {
     source = "../.."
 }
